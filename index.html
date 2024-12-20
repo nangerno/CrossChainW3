@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cross-Chain Messaging Report</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        margin: 20px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+      }
+
+      table,
+      th,
+      td {
+        border: 1px solid #ddd;
+      }
+
+      th,
+      td {
+        padding: 8px;
+        text-align: center;
+      }
+
+      th {
+        background-color: #f4f4f4;
+      }
+
+      .results-summary {
+        font-size: 1.1em;
+        font-weight: bold;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Cross-Chain Messaging Report</h1>
+    <p>
+      Testing Results for Sending 10 Messages from Arbitrum to Base using 5
+      Cross-Chain Messaging Protocols:
+    </p>
+
+    <h2>1) Hyperlane</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Transaction #</th>
+          <th>Cost (ETH)</th>
+          <th>Time (ms)</th>
+          <th>Transaction Hash</th>
+        </tr>
+      </thead>
+      <tbody id="hyperlaneResults"></tbody>
+    </table>
+
+    <h2>2) LayerZero</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Transaction #</th>
+          <th>Cost (ETH)</th>
+          <th>Time (ms)</th>
+          <th>Transaction Hash</th>
+        </tr>
+      </thead>
+      <tbody id="layerzeroResults"></tbody>
+    </table>
+
+    <h2>3) CCTP</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Transaction #</th>
+          <th>Cost (ETH)</th>
+          <th>Time (ms)</th>
+          <th>Transaction Hash</th>
+        </tr>
+      </thead>
+      <tbody id="cctpResults"></tbody>
+    </table>
+
+    <h2>4) Wormhole</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Transaction #</th>
+          <th>Cost (ETH)</th>
+          <th>Time (ms)</th>
+          <th>Transaction Hash</th>
+        </tr>
+      </thead>
+      <tbody id="wormholeResults"></tbody>
+    </table>
+
+    <h2>5) Axelar</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Transaction #</th>
+          <th>Cost (ETH)</th>
+          <th>Time (ms)</th>
+          <th>Transaction Hash</th>
+        </tr>
+      </thead>
+      <tbody id="axelarResults"></tbody>
+    </table>
+
+    <div class="results-summary" id="summary"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.8.0/dist/web3.min.js"></script>
+    <script>
+      const results = {
+        hyperlane: [],
+        layerzero: [],
+        cctp: [],
+        wormhole: [],
+        axelar: [],
+      };
+
+      function addResults(protocol, transactionNumber, cost, time, txHash) {
+        const tableId = `${protocol}Results`;
+        const resultRow = `<tr>
+                <td>${transactionNumber}</td>
+                <td>${cost} ETH</td>
+                <td>${time} ms</td>
+                <td><a href="https://explorer.hyperlane.xyz/message/${txHash}" target="_blank">${txHash}</a></td>
+            </tr>`;
+
+        document.getElementById(tableId).innerHTML += resultRow;
+
+        results[protocol].push({ cost, time, txHash });
+      }
+      function showSummary() {
+        let totalCost = 0;
+        let totalTime = 0;
+        let transactionCount = 0;
+
+        if (!results || Object.keys(results).length === 0) {
+          document.getElementById("summary").innerHTML =
+            "No results available.";
+          return;
+        }
+        Object.keys(results).forEach((protocol) => {
+          results[protocol].forEach((result) => {
+            const cost = parseFloat(result.cost);
+            const time = parseFloat(result.time);
+
+            if (!isNaN(cost) && !isNaN(time)) {
+              totalCost += cost;
+              totalTime += time;
+              transactionCount++;
+            } else {
+              console.warn(
+                `Invalid data found for protocol "${protocol}":`,
+                result
+              );
+            }
+          });
+        });
+
+        if (transactionCount === 0) {
+          document.getElementById("summary").innerHTML =
+            "No valid transactions to summarize.";
+          return;
+        }
+        const averageCost = (totalCost / transactionCount).toFixed(4);
+        const averageTime = (totalTime / transactionCount).toFixed(2);
+
+        document.getElementById("summary").innerHTML = `
+        Total Messages: ${transactionCount} <br>
+        Total Cost: ${totalCost.toFixed(4)} ETH <br>
+        Total Time: ${totalTime.toFixed(2)} ms <br>
+        Average Cost: ${averageCost} ETH <br>
+        Average Time: ${averageTime} ms
+    `;
+      }
+
+      async function sendAxelarTransaction(privateKey, nonce) {
+        const web3 = new Web3(window.ethereum);
+        const contractAddress = "0x52CE4a92eaC493a40275d96F72acCf07540c7BbC";
+        const abi = await fetch("axelar.json").then((res) => res.json());
+        const contract = new web3.eth.Contract(abi, contractAddress);
+
+        const account =
+          web3.eth.accounts.privateKeyToAccount(privateKey).address;
+        const destinationChain = "base-sepolia";
+        const destinationAddress = "0xe74F9a0626B0f2242246D6e5bBC1b832F0BA10C6";
+        const message = "Test Message";
+
+        for (let i = 0; i < 1; i++) {
+          const start = performance.now();
+          const data = contract.methods
+            .sendMessage(destinationChain, destinationAddress, message)
+            .encodeABI();
+          const txCount = nonce + i;
+
+          const tx = {
+            from: account,
+            to: contractAddress,
+            data: data,
+            gasLimit: 2000000,
+            value: web3.utils.toWei("0.01", "ether"),
+            gasPrice: await web3.eth.getGasPrice(),
+            nonce: txCount,
+          };
+
+          const signedTx = await web3.eth.accounts.signTransaction(
+            tx,
+            privateKey
+          );
+          const receipt = await web3.eth.sendSignedTransaction(
+            signedTx.rawTransaction
+          );
+          const end = performance.now();
+          const gasUsed = receipt.gasUsed;
+          const txCost = gasUsed * receipt.effectiveGasPrice;
+          const txHash = receipt.transactionHash;
+
+          addResults(
+            "axelar",
+            i + 1,
+            web3.utils.fromWei(txCost.toString(), "ether"),
+            (end - start).toFixed(2),
+            txHash
+          );
+        }
+      }
+
+      async function sendCCTPTransaction(privateKey, nonce) {
+        const web3 = new Web3(window.ethereum);
+        const contractAddress = "0xaCF1ceeF35caAc005e15888dDb8A3515C41B4872";
+        const abi = await fetch("cctp.json").then((res) => res.json());
+        const contract = new web3.eth.Contract(abi, contractAddress);
+
+        const account =
+          web3.eth.accounts.privateKeyToAccount(privateKey).address;
+        const recipient = "0x7865fAfC2db2093669d92c0F33AeEF291086BEFD";
+        const message = "Test Message";
+        const messageHex = web3.utils.asciiToHex(message);
+
+        for (let i = 0; i < 1; i++) {
+          const start = Date.now();
+          const gasPrice = await web3.eth.getGasPrice();
+          const txCount = nonce + i;
+
+          const tx = {
+            from: account,
+            to: contractAddress,
+            gasPrice: gasPrice,
+            gas: 1000000,
+            data: contract.methods
+              .sendMessage(6, recipient, messageHex)
+              .encodeABI(),
+            nonce: txCount,
+          };
+
+          const signedTx = await web3.eth.accounts.signTransaction(
+            tx,
+            privateKey
+          );
+          const receipt = await web3.eth.sendSignedTransaction(
+            signedTx.rawTransaction
+          );
+          const end = Date.now();
+          const gasUsed = receipt.gasUsed;
+          const costInWei = gasUsed * gasPrice;
+          const txHash = receipt.transactionHash;
+
+          addResults(
+            "cctp",
+            i + 1,
+            web3.utils.fromWei(costInWei.toString(), "ether"),
+            (end - start).toFixed(2),
+            txHash
+          );
+        }
+      }
+
+      async function sendHyperlaneTransaction(privateKey, nonce) {
+          const web3 = new Web3(window.ethereum);
+        const contractAddress = "0x6FEd6b332fA77AbDe129E2b43105AC0a33616129";
+        const abi = await fetch("hyperlane.json").then((res) => res.json());
+        const contract = new web3.eth.Contract(abi, contractAddress);
+
+        const account =
+          web3.eth.accounts.privateKeyToAccount(privateKey).address;
+        const recipient = "0x79BDab58d6d734fE0686993cc6BF9308b0bE327B";
+        const targetContract = new web3.eth.Contract(abi, recipient);
+        const message = "Test Message";
+        const messageHex = web3.utils.asciiToHex(message);
+        const destinationDomain = 84532;
+
+        for (let i = 0; i < 1; i++) {
+          const start = Date.now();
+          const gasPrice = await web3.eth.getGasPrice();
+          const txCount = nonce + i;
+
+          const tx = {
+            from: account,
+            to: contractAddress,
+            data: contract.methods
+              .sendMessage(
+                destinationDomain,
+                web3.utils.padLeft(recipient, 64),
+                message
+              )
+              .encodeABI(),
+            value: web3.utils.toWei("0.001", "ether"),
+            gasPrice: gasPrice,
+            gas: 1000000,
+            nonce: txCount,
+          };
+
+          const signedTx = await web3.eth.accounts.signTransaction(
+            tx,
+            privateKey
+          );
+          const receipt = await web3.eth.sendSignedTransaction(
+            signedTx.rawTransaction
+          );
+          const end = Date.now();
+          const gasUsed = receipt.gasUsed;
+          const txCost = gasUsed * receipt.effectiveGasPrice;
+          const txHash = receipt.transactionHash;
+
+          addResults(
+            "hyperlane",
+            i + 1,
+            web3.utils.fromWei(txCost.toString(), "ether"),
+            (end - start).toFixed(2),
+            txHash
+          );
+        }
+      }
+
+      async function sendLayerZeroTransaction(privateKey, nonce) {
+        const web3 = new Web3(window.ethereum);
+        const contractAddress = "0x6098e96a28E02f27B1e6BD381f870F1C8Bd169d3";
+        const abi = await fetch("layerzero.json").then((res) => res.json());
+        const contract = new web3.eth.Contract(abi, contractAddress);
+
+        const account =
+          web3.eth.accounts.privateKeyToAccount(privateKey).address;
+        const message = "Test Message";
+        const recipient = "0x55370E0fBB5f5b8dAeD978BA1c075a499eB107B8";
+        const dstChainId = 10245;
+
+        for (let i = 0; i < 1; i++) {
+          const start = Date.now();
+          const txCount = nonce + i;
+          const gasPrice = await web3.eth.getGasPrice();
+
+          const payload = web3.utils.asciiToHex(message);
+          const remoteAndLocalAddresses = web3.utils.hexToBytes(
+            recipient + account.substring(2)
+          );
+
+          const tx = {
+            from: account,
+            to: contractAddress,
+            data: contract.methods
+              .send(
+                dstChainId,
+                remoteAndLocalAddresses,
+                payload,
+                account,
+                "0x0000000000000000000000000000000000000000",
+                "0x"
+              )
+              .encodeABI(),
+            gas: 1000000,
+            nonce: txCount,
+            value: web3.utils.toWei("0.01", "ether"),
+          };
+
+          const signedTx = await web3.eth.accounts.signTransaction(
+            tx,
+            privateKey
+          );
+          const receipt = await web3.eth.sendSignedTransaction(
+            signedTx.rawTransaction
+          );
+
+          const end = Date.now();
+          const gasUsed = receipt.gasUsed;
+          const txCost = gasUsed * receipt.effectiveGasPrice;
+
+          const txHash = receipt.transactionHash;
+          addResults(
+            "layerzero",
+            i + 1,
+            web3.utils.fromWei(txCost.toString(), "ether"),
+            (end - start).toFixed(2),
+            txHash
+          );
+        }
+      }
+
+      async function sendWormholeTransaction(privateKey, nonce) {
+        const web3 = new Web3(window.ethereum);
+        const contractAddress = "0x07afD84d8A2E0344E2f488baac097Ea4F9Fa6D5B";
+        const abi = await fetch("wormhole.json").then((res) => res.json());
+        const contract = new web3.eth.Contract(abi, contractAddress);
+        const targetChainId = 10004;
+        const account =
+          web3.eth.accounts.privateKeyToAccount(privateKey).address;
+        const message = "Test Message";
+        const recipient = "0x66A2Eb8E9e9Bcd03c365d41d632135D1e4ada6Ff";
+
+        let totalCost = 0;
+        let totalTime = 0;
+
+        for (let i = 0; i < 1; i++) {
+          const start = Date.now();
+          const cost = await contract.methods
+            .quoteCrossChainCost(targetChainId)
+            .call();
+          const messageHex = web3.utils.asciiToHex(message);
+          const gasEstimate = await contract.methods
+            .sendMessage(targetChainId, recipient, messageHex)
+            .estimateGas({ from: account, value: cost });
+          const gasPrice = await web3.eth.getGasPrice();
+          const txCount = nonce + i;
+
+          const tx = {
+            from: account,
+            to: contractAddress,
+            data: contract.methods
+              .sendMessage(targetChainId, recipient, messageHex)
+              .encodeABI(),
+            gasPrice: gasPrice,
+            gas: gasEstimate,
+            value: cost,
+            nonce: txCount,
+          };
+
+          const signedTx = await web3.eth.accounts.signTransaction(
+            tx,
+            privateKey
+          );
+
+          const receipt = await web3.eth.sendSignedTransaction(
+            signedTx.rawTransaction
+          );
+
+          const end = Date.now();
+          const gasUsed = receipt.gasUsed;
+          const txCost = gasUsed * receipt.effectiveGasPrice;
+          const txHash = receipt.transactionHash;
+
+          totalCost += parseFloat(
+            web3.utils.fromWei(txCost.toString(), "ether")
+          );
+          totalTime += end - start;
+
+          addResults(
+            "wormhole",
+            i + 1,
+            web3.utils.fromWei(txCost.toString(), "ether"),
+            (end - start).toFixed(2),
+            txHash
+          );
+        }
+      }
+
+      async function executeTransactions() {
+        const privateKey = ""; // your private key of wallet
+        const web3 = new Web3(window.ethereum);
+
+        const account =
+          web3.eth.accounts.privateKeyToAccount(privateKey).address;
+
+        let currentNonce = await web3.eth.getTransactionCount(
+          account,
+          "latest"
+        );
+
+        await sendHyperlaneTransaction(privateKey, currentNonce);
+        currentNonce++; // Increment nonce after the transaction
+        await sendLayerZeroTransaction(privateKey, currentNonce);
+        currentNonce++; // Increment nonce
+        await sendCCTPTransaction(privateKey, currentNonce);
+        currentNonce++; // Increment nonce
+        await sendWormholeTransaction(privateKey, currentNonce);
+        currentNonce++; // Increment nonce
+        await sendAxelarTransaction(privateKey, currentNonce);
+        showSummary();
+      }
+      executeTransactions();
+    </script>
+  </body>
+</html>
